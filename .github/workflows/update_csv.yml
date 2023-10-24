@@ -1,74 +1,83 @@
 name: Daily CSV Update
 
 on:
-  schedule:
-    - cron: "0 8 * * *" # Runs every day at midnight (UTC)
-  workflow_dispatch:
+    schedule:
+        - cron: "0 8 * * *" # Runs every day at midnight (UTC)
+    workflow_dispatch:
 
 jobs:
-  update-csv:
-    runs-on: ubuntu-latest
+    update-csv:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v2
 
-      - name: Download New CSV
-        run: |
-          if curl -o data/new-data.csv https://catalogue.data.gov.bc.ca/dataset/4cc207cc-ff03-44f8-8c5f-415af5224646/resource/9a9f14e1-03ea-4a11-936a-6e77b15eeb39/download/childcare_locations.csv; then
-            echo "CSV download successful."
-          else
-            echo "CSV download failed."
-            exit 1
-          fi
+            - name: Download and Compare CSV Files
+              id: download-and-compare
+              run: |
+                  # Define a custom name mapping (URL to Filename)
+                  declare -A csv_mapping
+                  csv_mapping["https://portal.amfiindia.com/DownloadSchemeData_Po.aspx?mf=0"]="mf.csv" 
+                  csv_mapping["https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"]="equity.csv"
+                  csv_mapping["https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv"]="etf.csv"
+                  csv_mapping["https://nsearchives.nseindia.com/content/equities/DEBT.csv"]="debt.csv"
+                  csv_mapping["https://rbidocs.rbi.org.in/rdocs/Content/DOCs/SOVERIGNGOLDBONDS.xlsx"]="sgb.csv"
+                  csv_mapping["https://nsearchives.nseindia.com/content/equities/List_of_Active_Securities_CM_DEBT.csv"]="active.csv"
 
-      - name: Check CSV File Size
-        id: check-csv
-        run: |
-          if [ -s data/new-data.csv ]; then
-            echo "CSV file is not empty."
-          else
-            echo "CSV file is empty."
-            exit 1
-          fi
+                  # Create a directory to store the new CSV files
+                  mkdir -p new-csv-files
 
-      - name: Check for Differences
-        id: check-differences
-        run: |
-          if ! diff -q data/new-data.csv data/childcare_locations.csv; then
-            echo "CSV files are different."
-            echo "DIFFERENT_CSV=true" >> $GITHUB_ENV
-          else
-            echo "CSV files are the same. Skipping commit."
-            echo "DIFFERENT_CSV=false" >> $GITHUB_ENV
-          fi
+                  # Loop through the URLs and custom names
+                  for url in "${!csv_mapping[@]}"; do
+                    # Get the custom filename associated with the URL
+                    file_name="${csv_mapping[$url]}"
 
-      - name: Overwrite CSV
-        if: steps.check-csv.outcome == 'success' && env.DIFFERENT_CSV == 'true'
-        run: |
-          mv data/new-data.csv data/childcare_locations.csv
+                    # Download the CSV file
+                    if curl -o "new-csv-files/$file_name" "$url"; then
+                      echo "Downloaded $file_name successfully."
+                    else
+                      echo "Download of $file_name failed."
+                      continue  # Skip to the next file on failure
+                    fi
 
-      - name: Commit and Push Changes
-        if: steps.check-csv.outcome == 'success' && env.DIFFERENT_CSV == 'true'
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+                    # Compare the new CSV with the existing one
+                    if ! diff -q "new-csv-files/$file_name" "data/$file_name"; then
+                      echo "$file_name is different from the existing file."
+                      echo "DIFFERENT_CSV=true" >> $GITHUB_ENV
+                    else
+                      echo "$file_name is the same as the existing file. Skipping commit."
+                      echo "DIFFERENT_CSV=false" >> $GITHUB_ENV
+                    fi
+                  done
 
-          timestamp=$(date +'%Y%m%d%H%M%S')
-          branch_name="update-csv-$timestamp"
+            - name: Overwrite CSV Files
+              if: steps.download-and-compare.outputs.DIFFERENT_CSV == 'true'
+              run: |
+                  # Copy the new CSV files to the data directory
+                  cp new-csv-files/* data/
 
-          git checkout -b "$branch_name"
+            - name: Commit and Push Changes
+              if: steps.download-and-compare.outputs.DIFFERENT_CSV == 'true'
+              run: |
+                  git config --global user.name "GitHub Actions"
+                  git config --global user.email "actions@github.com"
 
-          git add data/childcare_locations.csv
+                  timestamp=$(date +'%Y%m%d%H%M%S')
+                  branch_name="update-csv-$timestamp"
 
-          git commit -m "Update CSV file"
+                  git checkout -b "$branch_name"
 
-          git push origin "$branch_name"
+                  git add data/*
 
-          git checkout main
-          git merge --no-ff "$branch_name"
-          git push origin main
+                  git commit -m "Update CSV files"
 
-          # delete the temporary branch
-          git branch -d "$branch_name"
-          git push origin --delete "$branch_name"
+                  git push origin "$branch_name"
+
+                  git checkout main
+                  git merge --no-ff "$branch_name"
+                  git push origin main
+
+                  # Delete the temporary branch
+                  git branch -d "$branch_name"
+                  git push origin --delete "$branch_name"
