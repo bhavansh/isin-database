@@ -33,14 +33,12 @@ jobs:
                     # Get the custom filename associated with the URL
                     file_name="${csv_mapping[$url]}"
 
-                    curl -o "new-csv-files/$file_name" "$url" --progress
-
-                    # Check if the download was successful
-                    if [ $? -eq 0 ]; then
-                        echo "Downloaded $file_name successfully."
+                    # Download the CSV file
+                    if wget --user-agent="Mozilla/5.0" -O "new-csv-files/$file_name" "$url"; then
+                      echo "Downloaded $file_name successfully."
                     else
-                        echo "Download of $file_name failed."
-                        continue  # Skip to the next file on failure
+                      echo "Download of $file_name failed."
+                      continue  # Skip to the next file on failure
                     fi
 
                     # Compare the new CSV with the existing one
