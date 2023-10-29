@@ -22,7 +22,7 @@ jobs:
                   csv_mapping["https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"]="equity.csv"
                   csv_mapping["https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv"]="etf.csv"
                   csv_mapping["https://nsearchives.nseindia.com/content/equities/DEBT.csv"]="debt.csv"
-                  csv_mapping["https://rbidocs.rbi.org.in/rdocs/Content/DOCs/SOVERIGNGOLDBONDS.xlsx"]="sgb.csv"
+                  csv_mapping["https://rbidocs.rbi.org.in/rdocs/Content/DOCs/SOVERIGNGOLDBONDS.xlsx"]="sgb.xlsx"
                   csv_mapping["https://nsearchives.nseindia.com/content/equities/List_of_Active_Securities_CM_DEBT.csv"]="active.csv"
 
                   # Create a directory to store the new CSV files
