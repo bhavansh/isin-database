@@ -1,7 +1,7 @@
 #  Copyright (c) 2023. Bhavansh Gupta.
 import sqlite3
 
-from isin_database.utils import get_isin_db_path
+from utils import get_isin_db_path
 
 
 def dict_factory(cursor, row):
@@ -19,7 +19,12 @@ class INDISINDb:
     cursor = None
 
     queries = {
-        'SEARCH_BY_ISIN' : 'SELECT mappimg from isin_consolidated WHERE isin = :isin'
+        "SEARCH_BY_ISIN": """ SELECT ISIN, SYMBOL, NAME, CATEGORY from consolidated_isin WHERE isin = :isin """,
+        "SEARCH_BY_ISIN_AND_CATEGORY": """SELECT ISIN, SYMBOL, NAME, CATEGORY from consolidated_isin 
+                WHERE symbol = :symbol and CATEGORY = :category """,
+        "SEARCH_BY_AMFI_CODE": """SELECT * FROM mf where CODE = :amfi_code""",
+        "QUERY_ALL_DATA_FOR_ISIN": """SELECT * FROM :db WHERE ISIN = :isin """
+
     }
 
     def __enter__(self):
@@ -58,10 +63,13 @@ class INDISINDb:
             if self_initialized:
                 self.close()
 
-    def search_by_isin(self, isin: str):
+    def search_by_query(self, query_name: str, **kwargs):
         """
         Lookup scheme data via ISIN code
-        :param isin: Fund ISIN
+        :param query_name: Query Name
+        :param kwargs: Keyword arguments for query parameters
         :return:
         """
-        return self.run_query(sql, {'isin':isin})
+        sql = self.queries[query_name]
+        return self.run_query(sql, kwargs)
+
